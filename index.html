@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Web App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #menu {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: #f1f1f1;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+        }
+        #content {
+            margin-bottom: 100px; /* чтобы было место для меню */
+        }
+        .page {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="content">
+        <!-- Главная страница -->
+        <div id="main" class="page">
+            <h1>Добро пожаловать!</h1>
+            <p id="username">Никнейм: </p>
+            <p id="userId">ID: </p>
+            <p id="tokens">Токены: </p>
+        </div>
+
+        <!-- Страница рефералов -->
+        <div id="referrals" class="page">
+            <h1>Рефералы</h1>
+            <p>Ваша реферальная ссылка: <span id="referralLink"></span></p>
+            <p>Количество приглашенных: <span id="referralCount"></span></p>
+            <ul id="referralList"></ul>
+        </div>
+
+        <!-- Страница с токенами -->
+        <div id="tokensPage" class="page">
+            <h1>Ваш баланс токенов</h1>
+            <p>Оставшиеся токены: <span id="remainingTokens"></span></p>
+        </div>
+    </div>
+
+    <!-- Меню внизу -->
+    <div id="menu">
+        <button onclick="showPage('main')">Main</button>
+        <button onclick="showPage('referrals')">Referrals</button>
+        <button onclick="showPage('tokensPage')">Tokens</button>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();  // Расширяет приложение на весь экран
+
+        // Получаем информацию о пользователе
+        let user = tg.initDataUnsafe.user;
+        let userId = user.id;
+        let username = user.username;
+
+        // Отображаем информацию на странице
+        document.getElementById('username').innerHTML += username;
+        document.getElementById('userId').innerHTML += userId;
+
+        // Показываем страницы по клику на меню
+        function showPage(pageId) {
+            let pages = document.getElementsByClassName('page');
+            for (let page of pages) {
+                page.style.display = 'none';
+            }
+            document.getElementById(pageId).style.display = 'block';
+        }
+
+        // Автоматически показываем главную страницу
+        showPage('main');
+
+        // Функция для запроса на сервер для получения токенов при входе
+        function getUserTokens() {
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    username: username
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('tokens').innerHTML = 'Токены: ' + data.tokens;
+            })
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        // Получаем токены при загрузке
+        getUserTokens();
+
+        // Функция для отображения рефералов
+        function loadReferrals() {
+            fetch(`/get_referrals?user_id=${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('referralCount').innerHTML = data.referral_count;
+                let referralList = document.getElementById('referralList');
+                referralList.innerHTML = '';
+                data.referrals.forEach(ref => {
+                    let li = document.createElement('li');
+                    li.textContent = `Никнейм: ${ref.username}, ID: ${ref.user_id}`;
+                    referralList.appendChild(li);
+                });
+                document.getElementById('referralLink').innerHTML = `${window.location.origin}/referral?referrer_id=${userId}`;
+            })
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        // Функция для получения оставшихся токенов
+        function loadRemainingTokens() {
+            fetch('/remaining_tokens')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('remainingTokens').innerHTML = data.remaining_tokens;
+            })
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        // Подгружаем данные при переходе на страницу
+        document.querySelector('button[onclick="showPage(\'referrals\')"]').addEventListener('click', loadReferrals);
+        document.querySelector('button[onclick="showPage(\'tokensPage\')"]').addEventListener('click', loadRemainingTokens);
+    </script>
+</body>
+</html>
+
